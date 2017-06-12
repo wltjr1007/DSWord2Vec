@@ -388,6 +388,104 @@ def get_statistic():
 
 
 
+def test_loopy_ensemble(query_word, is_tfidf=True):
+    from gensim.models import doc2vec, word2vec
+    tfidf_load_path = "/media/wltjr1007/nvme/HW/data/document2_review.tfidf"
+    dict_load_path = "/media/wltjr1007/nvme/HW/data/document2_review.dictionary"
+    doc2vec_load_path = "/media/wltjr1007/nvme/HW/data/model/0.doc2vec"
+    word2vec_load_path = "/media/wltjr1007/nvme/HW/data/model/5.word2vec"
+    tfidf_model = gensim.models.TfidfModel.load(tfidf_load_path)
+    dictionary = gensim.corpora.Dictionary.load(dict_load_path, mmap="r")
+    doc2vec_model = doc2vec.Doc2Vec.load(doc2vec_load_path)
+    word2vec_model = word2vec.Word2Vec.load(word2vec_load_path)
+
+    doc2vec_word_cos=doc2vec_model.most_similar(positive = [query_word], topn=50)
+    word2vec_word_cos=word2vec_model.most_similar(positive = [query_word], topn=50)
+
+    d_word = np.array(doc2vec_word_cos)[:,0]
+    d_cos = np.array(doc2vec_word_cos)[:,1]
+    w_word = np.array(word2vec_word_cos)[:,0]
+    w_cos = np.array(word2vec_word_cos)[:,1]
+
+
+    all_word_cos = dict(doc2vec_word_cos)
+
+    for wor, cos in word2vec_word_cos:
+        if wor not in all_word_cos:
+            all_word_cos[wor]=0
+        all_word_cos[wor]+=cos
+
+    tfidf_out = tfidf_model[dictionary.doc2bow(all_word_cos.keys())]
+    t_word = np.array(tfidf_out)[:,0].astype(np.int)
+    t_val = np.array(tfidf_out)[:,1].astype(np.float)
+    if is_tfidf:
+        for word_idx, tfidf in tfidf_out:
+            all_word_cos[dictionary.get(word_idx)] += tfidf
+
+    query_word = np.array([query_word])
+    query_word = np.concatenate((query_word, np.array(sorted(all_word_cos, key=all_word_cos.get, reverse=True)[:3])))
+
+
+    doc2vec_word_cos=doc2vec_model.most_similar(positive = query_word, topn=50)
+    word2vec_word_cos=word2vec_model.most_similar(positive = query_word, topn=50)
+
+    d_word = np.array(doc2vec_word_cos)[:,0]
+    d_cos = np.array(doc2vec_word_cos)[:,1]
+    w_word = np.array(word2vec_word_cos)[:,0]
+    w_cos = np.array(word2vec_word_cos)[:,1]
+
+
+    all_word_cos = dict(doc2vec_word_cos)
+
+    for wor, cos in word2vec_word_cos:
+        if wor not in all_word_cos:
+            all_word_cos[wor]=0
+        all_word_cos[wor]+=cos
+
+    tfidf_out = tfidf_model[dictionary.doc2bow(all_word_cos.keys())]
+    t_word = np.array(tfidf_out)[:,0].astype(np.int)
+    t_val = np.array(tfidf_out)[:,1].astype(np.float)
+    print("Loopy Ensemble Model Q=\"%s\""%query_word, end="")
+    if is_tfidf:
+        print(" With TF-IDF", end="")
+        for word_idx, tfidf in tfidf_out:
+            all_word_cos[dictionary.get(word_idx)] += tfidf
+    print()
+
+
+
+    print("Rank\tScore\t\tDoc2Vec\t\t\tWord2Vec\t\tTFIDF\t\t\tWord")
+    for cnt, w in enumerate(sorted(all_word_cos, key=all_word_cos.get, reverse=True)):
+        if cnt>=20:
+            break
+        print("%d\t\t%f\t"%(cnt+1, all_word_cos[w]), end="")
+        temp_rank =np.argwhere(d_word == w).squeeze()
+        temp_cos = d_cos[temp_rank].astype(np.float)
+        if not np.isscalar(temp_cos):
+            temp_cos = 0
+            temp_rank = -1
+        print("%f(%2d)\t" % (temp_cos, temp_rank+1),end="")
+
+        temp_rank = np.argwhere(w_word == w).squeeze()
+        temp_cos = w_cos[temp_rank].astype(np.float)
+        if not np.isscalar(temp_cos):
+            temp_cos = 0
+            temp_rank = -1
+        print("%f(%2d)\t" % (temp_cos,temp_rank+1), end="")
+
+
+        temp_rank = np.argwhere(t_word == dictionary.doc2bow([w])[0][0]).squeeze()
+        temp_cos = t_val[temp_rank].astype(np.float)
+        if not is_tfidf:
+            temp_rank = -1
+            temp_cos = 0
+        print("%f(%2d)\t" % (temp_cos,temp_rank+1), end="")
+
+        print("%s"%w)
+    print()
+
+
+
 if __name__=="__main__":
     # download()
     # unzip_data()
@@ -401,12 +499,19 @@ if __name__=="__main__":
     # train_doc2vec()
     # train_word2vec()
 
-    query_word = "coffee"
-    test_doc2vec(is_tfidf=False, query_word=query_word)
-    test_doc2vec(is_tfidf=True, query_word=query_word)
-    test_word2vec(is_tfidf=False, query_word=query_word)
-    test_word2vec(is_tfidf=True, query_word=query_word)
-    test_ensemble(is_tfidf=False, query_word=query_word)
-    test_ensemble(is_tfidf=True, query_word=query_word)
+    query_word = "earphone"
+    # test_doc2vec(is_tfidf=False, query_word=query_word)
+    # test_doc2vec(is_tfidf=True, query_word=query_word)
+    # test_word2vec(is_tfidf=False, query_word=query_word)
+    # test_word2vec(is_tfidf=True, query_word=query_word)
+    # test_ensemble(is_tfidf=False, query_word=query_word)
+    # test_ensemble(is_tfidf=True, query_word=query_word)
+    test_loopy_ensemble(query_word=query_word, is_tfidf=False)
+    test_loopy_ensemble(query_word=query_word, is_tfidf=True)
+
+
+
+
+
 
     # get_statistic()
