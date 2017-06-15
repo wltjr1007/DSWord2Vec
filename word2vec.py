@@ -22,7 +22,7 @@ def unzip_data():
 
     def un_gzip(path):
         old_path = "downloaded/%s_%s.json.gz"
-        new_path = "/media/wltjr1007/hdd/personal/HW/%s_%s.json"
+        new_path = "%s_%s.json"
         for cat in ["meta", "reviews"]:
             with gzip.open(old_path%(cat, path), "rb") as infile:
                 with open(new_path%(cat, path),"wb") as outfile:
@@ -41,8 +41,8 @@ def unzip_data():
             un_gzip(cur_name)
 
 def extract_meta():
-    meta_path = "/media/wltjr1007/nvme/HW/data/meta/"
-    save_path = "/media/wltjr1007/nvme/HW/data/%s"
+    meta_path = "data/meta/"
+    save_path = "data/%s"
     file_names = []
     for f in listdir(meta_path):
         if f.startswith("meta"):
@@ -68,6 +68,22 @@ def extract_meta():
     np.save(save_path%"asin_cat.npy", asin_cat)
     np.save(save_path%"cat_idx.npy", cat_idx)
 
+def extract_review():
+    review_path = "data/review/"
+    write_path= "data/"
+
+    asin_cat = np.load("data/asin_cat.npy").item()
+    all_cat = []
+    with open(write_path+"extracted_reviews.txt", "w") as ff:
+        for file_cnt, file_name in enumerate(listdir(review_path)):
+            print(file_cnt, file_name, end="")
+            with open(review_path+file_name, "r") as f:
+                for cur_prod in f:
+                    cur_prod = eval(cur_prod)
+                    all_cat.append(asin_cat[cur_prod["asin"]])
+                    ff.write(cur_prod["reviewText"]+"\n")
+                print("\t%d"%len(all_cat), end="\t")
+    np.save(write_path+"extracted_reviews_idx.npy", all_cat)
 
 class preprocess_data():
     def __init__(self):
@@ -88,7 +104,7 @@ class preprocess_data():
     def sentences_preprocess(self,sentences):
         result = []
         for word in self.tokenize(sentences.lower()):
-            if len(word)<3 or word in self.stopwords or not self.check(word):
+            if len(word)<3 or word in self.stopwords:
                 continue
             elif not self.check(word):
                 try:
@@ -112,8 +128,8 @@ class preprocess_data():
         return result_text
 
     def create_data(self):
-        path = "/media/wltjr1007/nvme/HW/data/"
-        write_path= "/media/wltjr1007/nvme/HW/data/parsed/%d.txt"
+        path = "data/"
+        write_path= "data/parsed/%d.txt"
         with open(path+"extracted_reviews.txt", "r") as f:
             import time
             clk = time.time()
@@ -131,53 +147,22 @@ class preprocess_data():
                     print("\r%d/%d\t%.2f %.2f"%(cnt, review_idx.shape[0],time.time()-clk, time.time()-local_clk))
 
 
-
-
-
-
-                # for cur_prod in f:
-                #     cur_prod = eval(cur_prod)
-                #     all_cat.append(asin_cat[cur_prod["asin"]])
-                #     all_text.append(cur_prod["reviewText"])
-                # print("\t%d"%len(all_text), end="\t")
-            #     result_text = p.map(func=self.sentences_preprocess, iterable=all_text)
-            #     p.close()
-            #     p.join()
-            # print(time.time()-local_time)
-
-def extract_review():
-    review_path = "/media/wltjr1007/nvme/HW/data/review/"
-    write_path= "/media/wltjr1007/nvme/HW/data/"
-
-    asin_cat = np.load("/media/wltjr1007/nvme/HW/data/asin_cat.npy").item()
-    all_cat = []
-    with open(write_path+"extracted_reviews.txt", "w") as ff:
-        for file_cnt, file_name in enumerate(listdir(review_path)):
-            print(file_cnt, file_name, end="")
-            with open(review_path+file_name, "r") as f:
-                for cur_prod in f:
-                    cur_prod = eval(cur_prod)
-                    all_cat.append(asin_cat[cur_prod["asin"]])
-                    ff.write(cur_prod["reviewText"]+"\n")
-                print("\t%d"%len(all_cat), end="\t")
-    np.save(write_path+"extracted_reviews_idx.npy", all_cat)
-
 def extract_document():
-    review_path = "/media/wltjr1007/nvme/HW/data/parsed/"
-    path = "/media/wltjr1007/nvme/HW/data/document2_review.txt"
+    review_path = "data/parsed/"
+    path = "data/document_reviews.txt"
     review_filename = [int(f.split(".")[0]) for f in listdir(review_path)]
     review_filename.sort()
     with open(path, "w") as ff:
         for i in review_filename:
             with open(review_path+"%d.txt"%i, "r") as f:
-                ff.write(" ".join([line.strip() for line in f][::10])+"\n")
+                ff.write(" ".join([line.strip() for line in f])+"\n")
             print(i)
 
 
 def save_tfidf():
-    path = "/media/wltjr1007/nvme/HW/data/document2_review.txt"
-    dict_save_path = "/media/wltjr1007/nvme/HW/data/document2_review.dictionary"
-    tfidf_save_path = "/media/wltjr1007/nvme/HW/data/document2_review.tfidf"
+    path = "data/document_reviews.txt"
+    dict_save_path = "data/document_reviews.dictionary"
+    tfidf_save_path = "data/document_reviews.tfidf"
 
     with open(path, "r") as f:
         document = [cur_doc.split() for cur_doc in f]
@@ -190,47 +175,76 @@ def save_tfidf():
     tfidf = gensim.models.TfidfModel(corpus=corpus)
     tfidf.save(tfidf_save_path)
 
-def get_tfidf():
-    tfidf_load_path = "/media/wltjr1007/nvme/HW/data/document2_review.tfidf"
+def train_word2vec():
+    from gensim.models import word2vec
+    import logging
+    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+    sentences = word2vec.LineSentence('data/document_reviews.txt')
 
-    model = gensim.models.TfidfModel.load(tfidf_load_path)
-    print(model[[(1,2)]])
+    save_path = "data/model/%d.word2vec"
+    model = word2vec.Word2Vec(sentences=sentences, size=500, alpha=0.025, window=5, sample=0.001, workers=5,
+                              min_alpha=0.0001, sg=1, hs=0, negative=20, iter=30, trim_rule=None, batch_words=10000)
 
+    model.save(save_path%5)
 
 def train_doc2vec():
     from gensim.models import doc2vec
     import logging
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
-    path = "/media/wltjr1007/nvme/HW/data/document2_review.txt"
-    save_path = "/media/wltjr1007/nvme/HW/data/model/%d.doc2vec"
+    path = "data/document_reviews.txt"
+    save_path = "data/model/%d.doc2vec"
     sentences = doc2vec.TaggedLineDocument(path)
-    model = doc2vec.Doc2Vec(sentences, iter=20, workers=5)
+    model = doc2vec.Doc2Vec(sentences=sentences, size=500, alpha=0.025, window=5, sample=0.001, workers=5,
+                              min_alpha=0.0001, sg=1, hs=0, negative=20, iter=20, trim_rule=None, batch_words=10000)
     model.save(save_path%0)
 
 
 
-
-
-
-def train_word2vec():
+def test_word2vec(query_word, is_tfidf=False):
     from gensim.models import word2vec
-    import logging
-    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
-    sentences = word2vec.LineSentence('/media/wltjr1007/nvme/HW/data/document2_review.txt')
+    dict_load_path = "data/document_reviews.dictionary"
+    tfidf_load_path = "data/document_reviews.tfidf"
+    load_path = "data/model/5.word2vec"
 
-    save_path = "/media/wltjr1007/nvme/HW/data/model/%d.word2vec"
-    model = word2vec.Word2Vec(sentences=sentences, size=500, alpha=0.025, window=5, sample=0.001, workers=5,
-                              min_alpha=0.0001, sg=1, hs=0, negative=20, cbow_mean=1, iter=5, null_word=0,
-                              trim_rule=None, sorted_vocab=1, batch_words=10000)
+    tfidf_model = gensim.models.TfidfModel.load(tfidf_load_path)
+    dictionary = gensim.corpora.Dictionary.load(dict_load_path, mmap="r")
+    model = word2vec.Word2Vec.load(load_path)
+    word_cos=np.array(model.most_similar(positive = [query_word], topn=50))
+    word = word_cos[:,0]
+    word_sort = word
+    cos = word_cos[:,1].astype(np.float)
+    cos_sim = word_cos[:,1].astype(np.float)
+    print("Word2Vec Q=\"%s\""%query_word, end=" ")
+    tfidf_out =np.array(tfidf_model[dictionary.doc2bow(word)])
+    tfidf_out_sorted = tfidf_out[np.argsort(tfidf_out[:,1])][::-1]
+    if is_tfidf:
+        print("With TF-IDF", end="")
+        cos_sim+= tfidf_out[:,-1]
+        sort_idx = np.argsort(cos_sim)[::-1]
+        cos_sim = cos_sim[sort_idx]
+        word_sort = word[sort_idx]
+        tfidf_out = tfidf_out[sort_idx]
+    print("\nRank\tScore\t\tWord2Vec\t\tTFIDF\t\t\tWord")
+    for cnt, (w, c) in enumerate(zip(word_sort, cos_sim)):
+        if cnt>=20:
+            break
+        temp_rank = np.argwhere(word==w).squeeze()
+        temp_val = cos[temp_rank]
+        print("%d\t\t%f\t%f(%2d)"%(cnt+1, c,temp_val,temp_rank+1), end="")
+        temp_val = tfidf_out[cnt,-1]
+        temp_rank = np.argwhere(tfidf_out_sorted[:,1]==temp_val)[0].squeeze()
+        if not is_tfidf:
+            temp_rank = -1
+            temp_val = 0
+        print("\t%f(%2d)\t%s"%(temp_val, temp_rank+1, w))
 
-    model.save(save_path%5)
-
+    print()
 
 def test_doc2vec(query_word, is_tfidf=False):
     from gensim.models import doc2vec
-    tfidf_load_path = "/media/wltjr1007/nvme/HW/data/document2_review.tfidf"
-    dict_load_path = "/media/wltjr1007/nvme/HW/data/document2_review.dictionary"
-    load_path = "/media/wltjr1007/nvme/HW/data/model/0.doc2vec"
+    tfidf_load_path = "data/document_reviews.tfidf"
+    dict_load_path = "data/document_reviews.dictionary"
+    load_path = "data/model/0.doc2vec"
 
     tfidf_model = gensim.models.TfidfModel.load(tfidf_load_path)
     dictionary = gensim.corpora.Dictionary.load(dict_load_path, mmap="r")
@@ -268,53 +282,13 @@ def test_doc2vec(query_word, is_tfidf=False):
     print()
 
 
-def test_word2vec(query_word, is_tfidf=False):
-    from gensim.models import word2vec
-    dict_load_path = "/media/wltjr1007/nvme/HW/data/document2_review.dictionary"
-    tfidf_load_path = "/media/wltjr1007/nvme/HW/data/document2_review.tfidf"
-    load_path = "/media/wltjr1007/nvme/HW/data/model/5.word2vec"
-
-    tfidf_model = gensim.models.TfidfModel.load(tfidf_load_path)
-    dictionary = gensim.corpora.Dictionary.load(dict_load_path, mmap="r")
-    model = word2vec.Word2Vec.load(load_path)
-    word_cos=np.array(model.most_similar(positive = [query_word], topn=50))
-    word = word_cos[:,0]
-    word_sort = word
-    cos = word_cos[:,1].astype(np.float)
-    cos_sim = word_cos[:,1].astype(np.float)
-    print("Word2Vec Q=\"%s\""%query_word, end=" ")
-    tfidf_out =np.array(tfidf_model[dictionary.doc2bow(word)])
-    tfidf_out_sorted = tfidf_out[np.argsort(tfidf_out[:,1])][::-1]
-    if is_tfidf:
-        print("With TF-IDF", end="")
-        cos_sim+= tfidf_out[:,-1]
-        sort_idx = np.argsort(cos_sim)[::-1]
-        cos_sim = cos_sim[sort_idx]
-        word_sort = word[sort_idx]
-        tfidf_out = tfidf_out[sort_idx]
-    print("\nRank\tScore\t\tWord2Vec\t\tTFIDF\t\t\tWord")
-    for cnt, (w, c) in enumerate(zip(word_sort, cos_sim)):
-        if cnt>=20:
-            break
-        temp_rank = np.argwhere(word==w).squeeze()
-        temp_val = cos[temp_rank]
-        print("%d\t\t%f\t%f(%2d)"%(cnt+1, c,temp_val,temp_rank+1), end="")
-        temp_val = tfidf_out[cnt,-1]
-        temp_rank = np.argwhere(tfidf_out_sorted[:,1]==temp_val)[0].squeeze()
-        if not is_tfidf:
-            temp_rank = -1
-            temp_val = 0
-        print("\t%f(%2d)\t%s"%(temp_val, temp_rank+1, w))
-
-    print()
-
 
 def test_ensemble(query_word, is_tfidf=False):
     from gensim.models import doc2vec, word2vec
-    tfidf_load_path = "/media/wltjr1007/nvme/HW/data/document2_review.tfidf"
-    dict_load_path = "/media/wltjr1007/nvme/HW/data/document2_review.dictionary"
-    doc2vec_load_path = "/media/wltjr1007/nvme/HW/data/model/0.doc2vec"
-    word2vec_load_path = "/media/wltjr1007/nvme/HW/data/model/5.word2vec"
+    tfidf_load_path = "data/document_reviews.tfidf"
+    dict_load_path = "data/document_reviews.dictionary"
+    doc2vec_load_path = "data/model/0.doc2vec"
+    word2vec_load_path = "data/model/5.word2vec"
     tfidf_model = gensim.models.TfidfModel.load(tfidf_load_path)
     dictionary = gensim.corpora.Dictionary.load(dict_load_path, mmap="r")
     doc2vec_model = doc2vec.Doc2Vec.load(doc2vec_load_path)
@@ -377,8 +351,8 @@ def test_ensemble(query_word, is_tfidf=False):
 
 def get_statistic():
 
-    dict_load_path = "/media/wltjr1007/nvme/HW/data/document2_review.dictionary"
-    tfidf_load_path = "/media/wltjr1007/nvme/HW/data/document2_review.tfidf"
+    dict_load_path = "data/document_reviews.dictionary"
+    tfidf_load_path = "data/document_reviews.tfidf"
     dictionary = gensim.corpora.Dictionary.load(dict_load_path, mmap="r")
     tfidf_model = gensim.models.TfidfModel.load(tfidf_load_path)
 
@@ -390,10 +364,10 @@ def get_statistic():
 
 def test_loopy_ensemble(query_word, is_tfidf=True):
     from gensim.models import doc2vec, word2vec
-    tfidf_load_path = "/media/wltjr1007/nvme/HW/data/document2_review.tfidf"
-    dict_load_path = "/media/wltjr1007/nvme/HW/data/document2_review.dictionary"
-    doc2vec_load_path = "/media/wltjr1007/nvme/HW/data/model/0.doc2vec"
-    word2vec_load_path = "/media/wltjr1007/nvme/HW/data/model/5.word2vec"
+    tfidf_load_path = "data/document_reviews.tfidf"
+    dict_load_path = "data/document_reviews.dictionary"
+    doc2vec_load_path = "data/model/0.doc2vec"
+    word2vec_load_path = "data/model/5.word2vec"
     tfidf_model = gensim.models.TfidfModel.load(tfidf_load_path)
     dictionary = gensim.corpora.Dictionary.load(dict_load_path, mmap="r")
     doc2vec_model = doc2vec.Doc2Vec.load(doc2vec_load_path)
@@ -401,12 +375,6 @@ def test_loopy_ensemble(query_word, is_tfidf=True):
 
     doc2vec_word_cos=doc2vec_model.most_similar(positive = [query_word], topn=50)
     word2vec_word_cos=word2vec_model.most_similar(positive = [query_word], topn=50)
-
-    d_word = np.array(doc2vec_word_cos)[:,0]
-    d_cos = np.array(doc2vec_word_cos)[:,1]
-    w_word = np.array(word2vec_word_cos)[:,0]
-    w_cos = np.array(word2vec_word_cos)[:,1]
-
 
     all_word_cos = dict(doc2vec_word_cos)
 
@@ -416,8 +384,6 @@ def test_loopy_ensemble(query_word, is_tfidf=True):
         all_word_cos[wor]+=cos
 
     tfidf_out = tfidf_model[dictionary.doc2bow(all_word_cos.keys())]
-    t_word = np.array(tfidf_out)[:,0].astype(np.int)
-    t_val = np.array(tfidf_out)[:,1].astype(np.float)
     if is_tfidf:
         for word_idx, tfidf in tfidf_out:
             all_word_cos[dictionary.get(word_idx)] += tfidf
@@ -495,7 +461,6 @@ if __name__=="__main__":
     # pd.create_data()
     # extract_document()
     # save_tfidf()
-    # get_tfidf()
     # train_doc2vec()
     # train_word2vec()
 
